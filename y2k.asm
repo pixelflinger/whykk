@@ -52,13 +52,13 @@ init:
 
         ; #0: stay resident, #1: return right away
         tst.l       d0
-        bne.b       .quit
+        bne.b       .exit
 
         ; Terminate and stay resident (Ptermres)
         Ptermres    d7
 
-.quit
-        ; Pterm0, quit right away
+.exit
+        ; Pterm0, exit right away
         Pterm0
 
 ; -----------------------------------------------------------------------------
@@ -66,6 +66,9 @@ init:
 ; -----------------------------------------------------------------------------
 
 main:
+         ; Per standard calling conventions, save all non-scratch registers we might use.
+         movem.l     d2-d7/a2-a6,-(sp)
+
         ; Query XBIOS vector
         Setexc      #XBIOS_VEC,-1
 
@@ -78,28 +81,31 @@ main:
 .next   cmp.l	    #'XBRA',-12(a0)     ; Check if it is a XBRA marker
         bne.b	    .not_installed      ; no, continue
         cmp.l	    #'Y2KF',-8(a0)      ; Check our XBRA marker
-        beq.b	    .quit               ; we found us, stop
+        beq.b	    .exit               ; we found us, stop
 	    move.l	    -4(a0),a0           ; Get next vector in the chain
         bra.b	    .next
 
 .not_installed
-        ; Print a little success message
-        Cconws      .success_msg(pc)
-
         ; Install our XBRA at the head of the list.
         Setexc      #XBIOS_VEC,xbios(pc)
 
-        ; no error
+        ; Print a little success message
+        Cconws      .success_msg(pc)
+
+        ; no error, stay resident
         clr.l       d0
+.return
+        movem.l     (sp)+,d2-d7/a2-a6   ; Restore non-scratch registers
         rts
 
-.quit
-        ; print an error message
+.exit
+        ; print the already installed message
         Cconws      .already_installed_msg(pc)
 
         ; no error, but don't stay resident
         move.l      #1,d0
-        rts
+        bra.s       .return
+
 
 .already_installed_msg
         dc.b    7, 'Already installed!', 13, 10, 0

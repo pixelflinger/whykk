@@ -25,11 +25,22 @@ OpPterm0        equ     $00
 OpCconws        equ     $09
 OpPtermres      equ     $31
 OpMshrink       equ     $4a
+OpTgetdate      equ     $2a
+OpTsetdate      equ     $2b
+OpTgettime      equ     $2c
+OpTsettime      equ     $2d
 
 ; -----------------------------------------------------------------------------
 ; BIOS functions
 ; -----------------------------------------------------------------------------
 OpSetexc        equ     5
+
+; -----------------------------------------------------------------------------
+; XBIOS functions
+; -----------------------------------------------------------------------------
+
+OpSettime       equ     22
+OpGettime       equ     23
 
 ; -----------------------------------------------------------------------------
 ; Exceptions vectors
@@ -46,7 +57,7 @@ Cconws macro
     pea     \1
     move.w  #OpCconws,-(sp)
     trap    #1
-    addq.l  #6,sp
+    addq.w  #6,sp
     endm
 
 ; void Pterm0()
@@ -73,6 +84,32 @@ Ptermres0 macro
     trap    #1
     endm
 
+Tsettime macro
+    move.w  \1,-(sp)
+    move.w  #OpTsettime,-(sp)
+    trap    #1
+    addq.w  #4,sp
+    endm
+
+Tsetdate macro
+    move.w  \1,-(sp)
+    move.w  #OpTsetdate,-(sp)
+    trap    #1
+    addq.w  #4,sp
+    endm
+
+Tgettime macro
+    move.w  #OpTgettime,-(sp)
+    trap    #1
+    addq.w  #2,sp
+    endm
+
+Tgetdate macro
+    move.w  #OpTgetdate,-(sp)
+    trap    #1
+    addq.w  #2,sp
+    endm
+
 ; -----------------------------------------------------------------------------
 ; BIOS macros
 ; -----------------------------------------------------------------------------
@@ -85,5 +122,22 @@ Setexc macro
     move.w  \1,-(sp)
     move.w  #OpSetexc,-(sp)
     trap    #13
-    addq.l  #8,sp
+    addq.w  #8,sp
+    endm
+
+; -----------------------------------------------------------------------------
+; XBIOS macros
+; -----------------------------------------------------------------------------
+
+Gettime macro
+    move.w  #OpGettime,-(sp)
+    trap    #14
+    addq.w  #2,sp
+    endm
+
+Settime macro
+    move.l  \1,-(sp)
+    move.w  #OpSettime,-(sp)
+    trap    #14
+    addq.w  #6,sp
     endm

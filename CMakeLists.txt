@@ -20,7 +20,7 @@ set(OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/y2k40.prg)
 # This command defines exactly how to build the final executable from the source.
 add_custom_command(
     OUTPUT ${OUTPUT_FILE}
-    COMMAND ${VASM_EXECUTABLE} -Ftos -m68000 -o ${OUTPUT_FILE} ${SOURCE_FILE}
+    COMMAND ${VASM_EXECUTABLE} -nosym -Ftos -m68000 -o ${OUTPUT_FILE} ${SOURCE_FILE}
     DEPENDS ${SOURCE_FILE} ${INCLUDE_FILE}
     COMMENT "Assembling ${SOURCE_FILE} -> ${OUTPUT_FILE}"
     VERBATIM

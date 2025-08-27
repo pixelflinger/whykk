@@ -27,8 +27,11 @@
         dc.l    'XBRA'
         dc.l    'Y2KF'
         dc.l    0
-xbios:  move.l      xbios-4,a0
-        jmp         (a0)
+xbios_hook:
+        ; we push the fallthrough address on the stack so that we don't have
+        ; to use any registers. Some badly written apps rely on this!
+        move.l      (xbios_hook-4)(pc),-(sp)
+        rts
 
 ; -----------------------------------------------------------------------------
 ; Init sequence
@@ -42,7 +45,7 @@ init:
 	    add.l	    28(a5),d7       ; bss section size
 	    add.l	    #$401,d7        ; stack size
 	    and.l	    #-2,d7          ; make sure we're multiple of 2
-        lea         (a5,d7),sp      ; set our stack
+        lea         (a5,d7.l),sp      ; set our stack
 
         ; and shrink memory to what we need
         Mshrink     a5,d7
@@ -50,12 +53,12 @@ init:
         ; call our main program
         jsr         main
 
-        ; #0: stay resident, #1: return right away
-        tst.l       d0
-        bne.b       .exit
+        ; true: stay resident, false: return right away
+        tst.w       d0
+        beq.b       .exit
 
         ; Terminate and stay resident (Ptermres)
-        Ptermres    d7
+        Ptermres0   d7
 
 .exit
         ; Pterm0, exit right away
@@ -66,36 +69,34 @@ init:
 ; -----------------------------------------------------------------------------
 
 main:
-         ; Per standard calling conventions, save all non-scratch registers we might use.
-         movem.l     d2-d7/a2-a6,-(sp)
+        ; Per standard calling convention d2-d7/a2-a6 must be preserved
+        ; or not used.
 
         ; Query XBIOS vector
-        Setexc      #XBIOS_VEC,-1
+        Setexc      #XBIOS_VECTOR,-1
 
         ; store old vector into our XBRA header
-        lea         xbios(pc),a0        ; Our XBRA header
-        move.l      d0,-4(a0)
+        lea         xbios_hook(pc),a0   ; Our XBRA header
+        move.l      d0,-4(a0)           ; This writes into the TEXT section!
 
         ; See if we're already installed
         move.l	    d0,a0               ; XBIOS vector
 .next   cmp.l	    #'XBRA',-12(a0)     ; Check if it is a XBRA marker
-        bne.b	    .not_installed      ; no, continue
+        bne.b	    .install            ; no, continue
         cmp.l	    #'Y2KF',-8(a0)      ; Check our XBRA marker
         beq.b	    .exit               ; we found us, stop
 	    move.l	    -4(a0),a0           ; Get next vector in the chain
-        bra.b	    .next
+        bra.s	    .next
 
-.not_installed
+.install
         ; Install our XBRA at the head of the list.
-        Setexc      #XBIOS_VEC,xbios(pc)
+        Setexc      #XBIOS_VECTOR,xbios_hook(pc)
 
         ; Print a little success message
         Cconws      .success_msg(pc)
 
         ; no error, stay resident
-        clr.l       d0
-.return
-        movem.l     (sp)+,d2-d7/a2-a6   ; Restore non-scratch registers
+        move.w      #1,d0
         rts
 
 .exit
@@ -103,8 +104,8 @@ main:
         Cconws      .already_installed_msg(pc)
 
         ; no error, but don't stay resident
-        move.l      #1,d0
-        bra.s       .return
+        clr.w       d0
+        rts
 
 
 .already_installed_msg

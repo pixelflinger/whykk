@@ -21,20 +21,21 @@
 ; -----------------------------------------------------------------------------
 ; GEMDOS functions
 ; -----------------------------------------------------------------------------
-Pterm0          equ     $00
-Cconws          equ     $09
-Ptermres        equ     $31
-Mshrink         equ     $4a
+OpPterm0        equ     $00
+OpCconws        equ     $09
+OpPtermres      equ     $31
+OpMshrink       equ     $4a
 
 ; -----------------------------------------------------------------------------
 ; BIOS functions
 ; -----------------------------------------------------------------------------
-Setexc          equ     5
-XBIOS_VEC       equ     46
+OpSetexc        equ     5
 
 ; -----------------------------------------------------------------------------
-; High-level system call macros
+; Exceptions vectors
 ; -----------------------------------------------------------------------------
+
+XBIOS_VECTOR    equ     46
 
 ; -----------------------------------------------------------------------------
 ; GEMDOS macros
@@ -43,7 +44,7 @@ XBIOS_VEC       equ     46
 ; void Cconws(const char* text_addr)
 Cconws macro
     pea     \1
-    move.w  #Cconws,-(sp)
+    move.w  #OpCconws,-(sp)
     trap    #1
     addq.l  #6,sp
     endm
@@ -59,16 +60,16 @@ Mshrink macro
     move.l  \2,-(sp)
     move.l  \1,-(sp)
     clr.w   -(sp)
-    move.w  #Mshrink,-(sp)
+    move.w  #OpMshrink,-(sp)
     trap    #1
     lea     12(sp),sp
     endm
 
 ; void Ptermres(long len_reg) - terminates with retcode 0
-Ptermres macro
+Ptermres0 macro
     clr.w   -(sp)
     move.l  \1,-(sp)
-    move.w  #Ptermres,-(sp)
+    move.w  #OpPtermres,-(sp)
     trap    #1
     endm
 
@@ -82,7 +83,7 @@ Ptermres macro
 Setexc macro
     pea     \2
     move.w  \1,-(sp)
-    move.w  #Setexc,-(sp)
+    move.w  #OpSetexc,-(sp)
     trap    #13
     addq.l  #8,sp
     endm

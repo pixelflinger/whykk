@@ -75,8 +75,9 @@ settime_hook
         bhi.s       .y2k                ; yes, jump to offset calculation
         clr.l       (yearOffset)        ; no, offset is zero
         bra.s       .fallthrough        ; continue with xbios
-        ; calculate a good offset to apply, must be multiple of 4
-        ; we apply a 16 years offset every 16 years from 1980
+        ; Calculate a good offset to apply, must be multiple of 4 and less
+        ; or equal to 20.
+        ; We apply a 16 years offset every 16 years from 1980
         ; except between 1996-1999.
 .y2k    and.l       #$FFF0,d1           ; floor((year - 1980) / 16) * 16
         ror.l       #7,d1               ; move the offset to its position
@@ -129,7 +130,7 @@ init:
 	    add.l	    28(a5),d7       ; bss section size
 	    add.l	    #$401,d7        ; stack size
 	    and.l	    #-2,d7          ; make sure we're multiple of 2
-        lea         (a5,d7.l),sp      ; set our stack
+        lea         (a5,d7.l),sp    ; set our stack
 
         ; and shrink memory to what we need
         Mshrink     a5,d7

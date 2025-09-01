@@ -15,34 +15,20 @@ message(STATUS "Using vasm assembler: ${VASM_EXECUTABLE}")
 # Common include file for all targets
 set(INCLUDE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/tos.i)
 
-# --- WHYKK Target ---
-set(WHYKK_SOURCE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/whykk.asm)
-set(WHYKK_OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/whykk.prg)
+macro(add_asm_target target_name)
+    set(SOURCE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/${target_name}.asm)
+    set(OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/${target_name}.prg)
+    add_custom_command(
+        OUTPUT ${OUTPUT_FILE}
+        COMMAND ${VASM_EXECUTABLE} -nosym -Ftos -m68000 -o ${OUTPUT_FILE} ${SOURCE_FILE}
+        DEPENDS ${SOURCE_FILE} ${INCLUDE_FILE}
+        COMMENT "Assembling ${SOURCE_FILE} -> ${OUTPUT_FILE}"
+        VERBATIM
+    )
+    add_custom_target(${target_name} ALL
+        DEPENDS ${OUTPUT_FILE}
+    )
+endmacro()
 
-add_custom_command(
-    OUTPUT ${WHYKK_OUTPUT_FILE}
-    COMMAND ${VASM_EXECUTABLE} -nosym -Ftos -m68000 -o ${WHYKK_OUTPUT_FILE} ${WHYKK_SOURCE_FILE}
-    DEPENDS ${WHYKK_SOURCE_FILE} ${INCLUDE_FILE}
-    COMMENT "Assembling ${WHYKK_SOURCE_FILE} -> ${WHYKK_OUTPUT_FILE}"
-    VERBATIM
-)
-
-add_custom_target(whykk ALL
-    DEPENDS ${WHYKK_OUTPUT_FILE}
-)
-
-# --- TIMEKPR Target ---
-set(TIMEKPR_SOURCE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/timekpr.asm)
-set(TIMEKPR_OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/timekpr.prg)
-
-add_custom_command(
-    OUTPUT ${TIMEKPR_OUTPUT_FILE}
-    COMMAND ${VASM_EXECUTABLE} -nosym -Ftos -m68000 -o ${TIMEKPR_OUTPUT_FILE} ${TIMEKPR_SOURCE_FILE}
-    DEPENDS ${TIMEKPR_SOURCE_FILE} ${INCLUDE_FILE}
-    COMMENT "Assembling ${TIMEKPR_SOURCE_FILE} -> ${TIMEKPR_OUTPUT_FILE}"
-    VERBATIM
-)
-
-add_custom_target(timekpr ALL
-    DEPENDS ${TIMEKPR_OUTPUT_FILE}
-)
+add_asm_target(whykk)
+add_asm_target(timekpr)

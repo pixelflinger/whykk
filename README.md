@@ -11,7 +11,7 @@ your Atari ST's boot disk. The program will then be automatically executed at
 startup, patching the system.
 
 With TOS 2.06+ you also need to install `TIMEKPR.PRG`. To do so, copy 
-`TIMEKPR.PRG` to the `AUTO` folder.
+`TIMEKPR.PRG` to the `AUTO` folder as well.
 
 > **NOTE:** `TIMEKPR.PRG` **must** be executed **before** any other `XBIOS` hooks 
 > or the system will crash. If `TIMEKPR.PRG` is not the first hook in the `AUTO`
@@ -49,7 +49,7 @@ directory.
 
 ## The Y2K bug on Atari ST
 
-The Y2K (Year 2000) bug on the Atari ST is due to a subtle conflict between 
+The Y2K (Year 2000) bug on the Atari ST is due to a conflict between 
 two operating system layers: GEMDOS (the disk operating system) and XBIOS 
 (the extended BIOS).
 
@@ -75,7 +75,7 @@ The two layers synchronize with each other at specific moments:
     XBIOS. This ensures the time is correct even if the terminating program had
     taken over system timers for its own use, which was rather common.
 
-3. On TOS 2.06 and above, GEMDOS is re-synchronized during the boot sequence 
+3. On TOS 1.06 and above, GEMDOS is re-synchronized during the boot sequence 
    from either the IKBD or the Real-Time Clock if present. Unfortunately, 
    this is done by accessing the hardware directly, bypassing the XBIOS.
 
@@ -93,7 +93,7 @@ year.
 The real problem lies with machines that lack a battery-backed Real-Time Clock
 (RTC), such as the Atari ST and STE models. On these systems, the XBIOS relies
 on the **IKBD (Intelligent Keyboard)** to maintain the date and time between
-program launches and warm reboots (on TOS versions 2.06 and later).
+program launches and warm reboots (on TOS versions 1.06 and later).
 
 The IKBD's firmware was designed to handle only years between 1900 and 1999.
 However, the GEMDOS/XBIOS API uses 1980 as its starting point (year 0). This
@@ -111,10 +111,10 @@ fail.
 It is worth noting that other Y2K-related issues exist at the application
 level, separate from the XBIOS bug this patch addresses.
 
-*   **Display Glitches:** Some applications may not display years past 1999
+*   **Display glitches:** Some applications may not display years past 1999
     correctly, even if the underlying system date is accurate. This is
     typically a cosmetic issue.
-*   **Control Panel Limitation:** The standard Atari Control Panel accessory
+*   **Control Panel limitation:** The standard Atari Control Panel accessory
     (`CONTROL.ACC` or `XCONTROL.ACC`) uses a two-digit year input. 
     This limits its effective range to **1980-2079**. After the year 2079, an 
     alternative utility will be required to set the system date.
@@ -122,7 +122,7 @@ level, separate from the XBIOS bug this patch addresses.
 ### The Solution: An XBIOS Intercept
 
 Since the problem is confined to the XBIOS interaction with the IKBD, we can
-fix it by "lying" to the IKBD.
+fix it by "lying" to the XBIOS and consequently the IKBD.
 
 1.  **When setting the time:** The patch intercepts the year value. If the year
     is 2000 or later, it subtracts an offset (e.g., 32 years) before
@@ -135,22 +135,23 @@ fix it by "lying" to the IKBD.
 The offset is automatically calculated based on the target year and must be a 
 multiple of 4 to ensure leap years are handled correctly.
 Because the IKBD's effective range is only 20 years (1980-1999), this patch
-cannot use a fixed offset as it needs to be updated every 20 years.
+cannot use a fixed offset as the later needs to be updated every 20 years. This
+problem happened in 2021 with previous patches, such as `Y2KFIX`.
 
 #### Complications
 
 This interception method, while effective, introduces two main complications:
 
-1.  **TOS 2.06+ `Settime` Anomaly:** On TOS versions 2.06 and later, a call to
-    the XBIOS `Settime` function has the unintended side effect of also
+1.  **TOS 2.06+ `settime` anomaly:** On TOS versions 2.06 and later, a call to
+    the XBIOS `settime` function has the curious side effect of also
     updating the GEMDOS system clock. This behavior, which appears to be
     redundant, directly conflicts with our patch. When `WHYKK` passes an
-    adjusted year (e.g., 1992 for 2024) to `Settime`, this incorrect year is
-    immediately propagated to GEMDOS, defeating the purpose of the patch. This
-    issue is resolved by `TIMEKPR.PRG`, a companion utility that patches the
-    original XBIOS `Settime` routine to bypass the code that updates GEMDOS.
+    adjusted year (e.g., 1992 for 2024) to `settime`, this incorrect year is
+    immediately propagated back to GEMDOS, defeating the purpose of the patch. 
+    This issue is resolved by `TIMEKPR.PRG`, a companion utility that patches 
+    the original XBIOS `settime` routine to bypass the code that updates GEMDOS.
 
-2.  **State Loss on Warm Reset:** After a warm reset (e.g., pressing the reset
+2.  **State loss on warm reset:** After a warm reset (e.g., pressing the reset
     button), `WHYKK.PRG` loses its internal state, including the calculated
     year offset. When GEMDOS later resynchronizes its clock from the IKBD,
     `WHYKK` intercepts the call but doesn't know the correct offset to add back
@@ -164,11 +165,11 @@ This interception method, while effective, introduces two main complications:
 
 `TIMEKPR.PRG` is a companion utility specifically designed for Atari ST systems
 running TOS 2.06 or higher. Its purpose is to address a specific anomaly in
-TOS 2.06+ where the XBIOS `Settime` function inadvertently updates the GEMDOS
+TOS 2.06+ where the XBIOS `settime` function curiously updates the GEMDOS
 system clock, interfering with `WHYKK.PRG`'s year correction mechanism.
 
-When `TIMEKPR.PRG` is installed, it patches the original XBIOS `Settime` routine
-to prevent this redundant GEMDOS clock update. This ensures that `WHYKK.PRG`
+When `TIMEKPR.PRG` is installed, it patches the original XBIOS `settime` routine
+to prevent this unnecessary GEMDOS clock update. This ensures that `WHYKK.PRG`
 can correctly manage the year offset without its adjustments being overridden
 by TOS.
 
@@ -178,7 +179,7 @@ The root of the problem with TOS 2.06+ `settime` function is that it updates
 the GEMDOS's date and time too. This is done by the first two instructions of
 `settime`:
 
-```
+```ASM
 settime:
     MOVE.W 4(sp), gemdos_time
     MOVE.W 6(sp), gemdos_date
@@ -189,7 +190,7 @@ settime:
 to override `settime` directly, instead we need intercept the `XBIOS` vector.
 Our silver lining is that TOS implements the XBIOS with a jump table:
 
-```
+```ASM
 xbios:
     LEA.L jumptable(PC),A0
     ...

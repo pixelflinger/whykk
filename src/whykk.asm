@@ -128,8 +128,6 @@ init:
 	    add.l	    12(a5),d7       ; text section size
 	    add.l	    20(a5),d7       ; data section size
 	    add.l	    28(a5),d7       ; bss section size
-	    add.l	    #$401,d7        ; stack size
-	    and.l	    #-2,d7          ; make sure we're multiple of 2
         lea         (a5,d7.l),sp    ; set our stack
 
         ; and shrink memory to what we need
@@ -197,6 +195,7 @@ main:
 ; -----------------------------------------------------------------------------
 ; data section
 ; -----------------------------------------------------------------------------
+        even
         data
 
 msg_welcome
@@ -204,3 +203,13 @@ msg_welcome
 
 msg_already_installed
         dc.b    7, 'Already installed.', 13, 10, 0
+
+; -----------------------------------------------------------------------------
+; bss section
+; -----------------------------------------------------------------------------
+        even
+        bss
+
+        ; stack must be last
+stack   ds.l    64          ; 256 bytes of stack should be enough
+

@@ -28,6 +28,7 @@ _sysbase        equ     $4f2
 ; GEMDOS functions
 ; -----------------------------------------------------------------------------
 OpPterm0        equ     $00
+OpCnecin        equ     $08
 OpCconws        equ     $09
 OpPtermres      equ     $31
 OpMshrink       equ     $4a
@@ -58,6 +59,13 @@ XBIOS_VECTOR    equ     46
 ; -----------------------------------------------------------------------------
 ; GEMDOS macros
 ; -----------------------------------------------------------------------------
+
+; LONG Cnecin()
+Cnecin macro
+    move.w  #OpCnecin,-(sp)
+    trap    #1
+    addq.w  #2,sp
+    endm
 
 ; void Cconws(const char* text_addr)
 Cconws macro

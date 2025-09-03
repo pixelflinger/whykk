@@ -58,7 +58,7 @@ XBRA_SYSCALL_FALLTHROUGH macro
         dc.l    0
 xbios_hook:
         ; syscall parameters pointer returned in a0
-        bsr.w      get_syscall_params
+        bsr.s       get_syscall_params
 
         cmp.w       #OpSettime,(a0)
         beq.s       settime_hook
@@ -72,21 +72,22 @@ settime_hook
         move.l      2(a0),d0            ; get settime's parameter
 
         ; calculate the offset to apply
+        lea.l       yearOffset(pc),a0   ; our offset address
         move.l      d1,-(sp)            ; don't clobber anything
         move.l      d0,d1               ; preserve d0
         rol.l       #7,d1               ; move the year into low bits
         and.w       #$7F,d1             ; clear all other bits
         cmp.w       #(1999-1980),d1     ; check if year above 1999 is requested
         bhi.s       .y2k                ; yes, jump to offset calculation
-        clr.l       (yearOffset)        ; no, offset is zero
+        clr.l       (a0)                ; no, offset is zero
         bra.s       .fallthrough        ; continue with xbios
         ; Calculate a good offset to apply, must be multiple of 4 and less
         ; or equal to 20.
         ; We apply a 16 years offset every 16 years from 1980
         ; except between 1996-1999.
-.y2k    and.l       #$FFF0,d1           ; floor((year - 1980) / 16) * 16
+.y2k    and.l       #$0000FFF0,d1       ; floor((year - 1980) / 16) * 16
         ror.l       #7,d1               ; move the offset to its position
-        move.l      d1,(yearOffset)     ; store it for gettime()
+        move.l      d1,(a0)             ; store it for gettime()
         sub.l       d1,d0               ; and apply the settime() correction
 
         ; call settime() with the new parameters
@@ -94,7 +95,7 @@ settime_hook
         move.l      (sp)+,d1            ; restore our clobbered registers
         ; call to the original settime
         movem.l     d3-d7/a3-a6,-(sp)       ; save all registers
-        move.l      d0,-(sp)                ; write parameter on the stac;
+        move.l      d0,-(sp)                ; write parameter on the stack
         suba.l      a5,a5                   ; TOS does this, so do we
         move.l      xbios_settime(pc),a0    ; Load original XBIOS settime addr
         jsr         (a0)                    ; call it
@@ -109,13 +110,13 @@ gettime_hook
         addq.w      #2,sp
 
         ; add back year offset
-        add.l       (yearOffset),d0
+        add.l       yearOffset(pc),d0
         rte
 
 get_syscall_params:
 	    btst	    #5,4(sp)        ; check if we were called from supervisor
 	    bne.s	    .super          ; yes, use sp
-        move	    usp,a0          ; no, use usp
+        move.l	    usp,a0          ; no, use usp
         rts
 .super  lea	        (6+4)(sp),a0    ; when using sp, we need to offset for
 	    tst.w	    $59e.w          ; the parameters
@@ -143,7 +144,7 @@ TSR_end
 ; -----------------------------------------------------------------------------
 init:
         ; call our main program
-        jsr         main
+        bsr.s       main
 
         ; true: stay resident, false: return right away
         tst.w       d0
@@ -175,7 +176,7 @@ main:
         Setexc      #XBIOS_VECTOR,-1
 
         ; store old vector into our XBRA header
-        lea         xbios_hook(pc),a0   ; Our XBRA header
+        lea.l       xbios_hook(pc),a0   ; Our XBRA header
         move.l      d0,-4(a0)           ; This writes into the TEXT section!
 
         ; See if we're already installed
@@ -203,7 +204,7 @@ main:
         move.l      (4*OpSettime)(a0),a2
 
         ; on TOS 2.xx and above skip the first two instructions of settime
-        jsr         get_tos_version(pc)
+        bsr.s       get_tos_version
         cmp.w       #$0200,d0
         bls.s       .store_settime_hook
         lea.l       16(a2),a2
@@ -245,7 +246,7 @@ get_tos_version:
         data
 
 msg_welcome
-        dc.b    'WHYKK v0.2.0 (c) 2025 Mathias Agopian', 13, 10, 0
+        dc.b    'WHYKK v0.3.0 (c) 2025 Mathias Agopian', 13, 10, 0
 
 msg_already_installed
         dc.b    7, 'Already installed.', 13, 10, 0

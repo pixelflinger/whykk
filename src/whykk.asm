@@ -246,7 +246,7 @@ get_tos_version:
         data
 
 msg_welcome
-        dc.b    'WHYKK v0.1.0 (c) 2025 Mathias Agopian', 13, 10, 0
+        dc.b    'WHYKK v0.2.0 (c) 2025 Mathias Agopian', 13, 10, 0
 
 msg_already_installed
         dc.b    7, 'Already installed.', 13, 10, 0

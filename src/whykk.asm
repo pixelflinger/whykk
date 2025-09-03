@@ -60,14 +60,19 @@ xbios_hook:
         ; syscall parameters pointer returned in a0
         bsr.s       get_syscall_params
 
-        cmp.w       #OpSettime,(a0)
-        beq.s       settime_hook
+        move.w      (a0),d0             ; Get opcode
+        subi.w      #OpSettime,d0       ; Check for Settime (22) or Gettime (23)
+        cmpi.w      #1,d0               ; Is the result 0 (Settime) or 1 (Gettime)?
+        bls.s       .handle_hook        ; If lower or same, it's one of ours.
 
-        cmp.w       #OpGettime,(a0)
-        beq.s       gettime_hook
-
+        ; Fallthrough for all other opcodes (most common path)
         XBRA_FALLTHROUGH xbios_hook
 
+.handle_hook:
+        ; At this point, d0 is either 0 or 1. The Z flag from the 'cmpi.w'
+        ; is set if d0 was 1 (Gettime).
+        beq.s       gettime_hook        ; If Z is set, it was Gettime.
+        ; Fallthrough to settime_hook if Z is not set (d0 was 0).
 settime_hook
         move.l      2(a0),d0            ; get settime's parameter
 

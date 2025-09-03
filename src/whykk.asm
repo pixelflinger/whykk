@@ -24,25 +24,30 @@
 ; Macros for dealing with syscalls and XBRA
 ; -----------------------------------------------------------------------------
 
-; fallthrough the previous hook given a XBRA hook
-XBRA_FALLTHROUGH macro
-    move.l      (\1-4)(pc),-(sp)
-    rts
-    endm
-
-; generate a syscall stackframe and call the previous hook given a XBRA hook
-XBRA_SYSCALL_PREVIOUS_HOOK macro
+; generate a syscall stackframe
+RTE_STACKFRAME macro
 	    ; this emulates a "trap" stack frame
 	    tst.w	    $59e.w
 	    beq.s	    .short_stack_frame\@
 	    clr.w       -(sp)
 .short_stack_frame\@
-	    move.l      #.return\@,-(sp)
+	    move.l      \1,-(sp)
 	    move.w      sr,-(sp)
+        endm
+
+
+; fallthrough the previous hook given a XBRA hook
+XBRA_FALLTHROUGH macro
+        move.l      (\1-4)(pc),-(sp)
+        rts
+        endm
+
+XBRA_SYSCALL_FALLTHROUGH macro
+        RTE_STACKFRAME #.return\@
 	    XBRA_FALLTHROUGH \1
 .return\@
-    ; this is where the syscall's rte will return to
-    endm
+        ; this is where the syscall's rte will return to
+        endm
 
 ; -----------------------------------------------------------------------------
 ; XBIOS replacement (TSR)
@@ -64,7 +69,7 @@ xbios_hook:
         XBRA_FALLTHROUGH xbios_hook
 
 settime_hook
-        move.l      2(a0),d0    ; get settime's parameter
+        move.l      2(a0),d0            ; get settime's parameter
 
         ; calculate the offset to apply
         move.l      d1,-(sp)            ; don't clobber anything
@@ -87,16 +92,20 @@ settime_hook
         ; call settime() with the new parameters
 .fallthrough
         move.l      (sp)+,d1            ; restore our clobbered registers
-        move.l      d0,-(sp)
-	    move.w      #OpSettime,-(sp)
-        XBRA_SYSCALL_PREVIOUS_HOOK xbios_hook
-        addq.w      #6,sp
+        ; call to the original settime
+        movem.l     d3-d7/a3-a6,-(sp)       ; save all registers
+        move.l      d0,-(sp)                ; write parameter on the stac;
+        suba.l      a5,a5                   ; TOS does this, so do we
+        move.l      xbios_settime(pc),a0    ; Load original XBIOS settime addr
+        jsr         (a0)                    ; call it
+        addq.w      #4,sp                   ; correct stack
+        movem.l     (sp)+,d3-d7/a3-a6       ; and restore registers
         rte
 
 gettime_hook
         ; pretend we're doing a gettime call
 	    move.w      #OpGettime,-(sp)
-        XBRA_SYSCALL_PREVIOUS_HOOK xbios_hook
+        XBRA_SYSCALL_FALLTHROUGH xbios_hook
         addq.w      #2,sp
 
         ; add back year offset
@@ -113,6 +122,10 @@ get_syscall_params:
 	    beq.s	    .short
 	    addq.w	    #2,a0
 .short  rts
+
+; original XBIOS' settime hook
+xbios_settime
+            dc.l    0
 
 ; this is the data section of our resident program.
 ; It leaves in the text section!
@@ -176,6 +189,30 @@ main:
         bra.s	    .next
 
 .install
+        ; Get XBIOS' jumptable:
+        ; Calling an unsupported XBIOS or BIOS call returns the function
+        ; code in D0. Additionally the jumptable is also returned
+        ; in A0. This is not an official behavior but works on all TOS versions.
+        move.w      #$7FFF,-(sp)
+        trap        #14
+        addq.w      #2,sp
+
+        ; TODO: we could use some heuristics to make sure we got the ROM's
+        ;       `settime` and fail installation if we did not.
+
+        ; retrieve the original settime hook
+        move.l      (4*OpSettime)(a0),a2
+
+        ; on TOS 2.xx and above skip the first two instructions of settime
+        jsr         get_tos_version(pc)
+        cmp.w       #$0200,d0
+        bls.s       .store_settime_hook
+        lea.l       16(a2),a2
+.store_settime_hook
+        ; store the effective settime hook
+        lea.l       xbios_settime(pc),a0
+        move.l      a2,(a0)
+
         ; Install our XBRA at the head of the list.
         Setexc      #XBIOS_VECTOR,xbios_hook(pc)
 
@@ -190,6 +227,16 @@ main:
 
         ; no error, but don't stay resident
         clr.w       d0
+        rts
+
+; -----------------------------------------------------------------------------
+; get_tos_version - returns the TOS version in d0
+; -----------------------------------------------------------------------------
+get_tos_version:
+        Supexc  .tos(pc)
+        rts
+.tos    move.l  _sysbase,a0
+        move.w  2(a0),d0
         rts
 
 ; -----------------------------------------------------------------------------
@@ -212,4 +259,3 @@ msg_already_installed
 
         ; stack must be last
 stack   ds.l    64          ; 256 bytes of stack should be enough
-

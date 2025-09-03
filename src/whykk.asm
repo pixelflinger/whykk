@@ -58,7 +58,18 @@ XBRA_SYSCALL_FALLTHROUGH macro
         dc.l    0
 xbios_hook:
         ; syscall parameters pointer returned in a0
-        bsr.s       get_syscall_params
+	    btst	    #5,(sp)             ; check if we were called from supervisor
+	    bne.s	    .get_params_super   ; yes, use sp
+        ; User mode path
+        move.l	    usp,a0              ; no, use usp
+        bra.s       .got_params         ; continue to opcode check
+.get_params_super:
+        ; Supervisor mode path
+        lea	        6(sp),a0            ; when using sp, we need to offset for the parameters
+	    tst.w	    $59e.w              ; check for long/short stack frame
+	    beq.s	    .got_params         ; branch if short
+	    addq.w	    #2,a0               ; adjust for long stack frame (68010+)
+.got_params:
 
         move.w      (a0),d0             ; Get opcode
         subi.w      #OpSettime,d0       ; Check for Settime (22) or Gettime (23)
@@ -117,17 +128,6 @@ gettime_hook
         ; add back year offset
         add.l       yearOffset(pc),d0
         rte
-
-get_syscall_params:
-	    btst	    #5,4(sp)        ; check if we were called from supervisor
-	    bne.s	    .super          ; yes, use sp
-        move.l	    usp,a0          ; no, use usp
-        rts
-.super  lea	        (6+4)(sp),a0    ; when using sp, we need to offset for
-	    tst.w	    $59e.w          ; the parameters
-	    beq.s	    .short
-	    addq.w	    #2,a0
-.short  rts
 
 ; original XBIOS' settime hook
 xbios_settime

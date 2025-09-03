@@ -17,7 +17,8 @@ set(INCLUDE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/tos.i)
 
 macro(add_asm_target target_name)
     set(SOURCE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/${target_name}.asm)
-    set(OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/${target_name}.prg)
+    string(TOUPPER ${target_name} upper_target_name)
+    set(OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/${upper_target_name}.PRG)
     add_custom_command(
         OUTPUT ${OUTPUT_FILE}
         COMMAND ${VASM_EXECUTABLE} -nosym -Ftos -m68000 -o ${OUTPUT_FILE} ${SOURCE_FILE}

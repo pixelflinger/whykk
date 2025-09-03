@@ -31,4 +31,3 @@ macro(add_asm_target target_name)
 endmacro()
 
 add_asm_target(whykk)
-add_asm_target(timekpr)

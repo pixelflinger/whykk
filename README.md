@@ -10,14 +10,6 @@ To use the patch, copy the `WHYKK.PRG` file to the `AUTO` folder on
 your Atari ST's boot disk. The program will then be automatically executed at
 startup, patching the system.
 
-With TOS 2.06+ you also need to install `TIMEKPR.PRG`. To do so, copy 
-`TIMEKPR.PRG` to the `AUTO` folder as well.
-
-> **NOTE:** `TIMEKPR.PRG` **must** be executed **before** any other `XBIOS` hooks 
-> or the system will crash. If `TIMEKPR.PRG` is not the first hook in the `AUTO`
-> folder, it will *attempt* to install itself first; but this may not work if
-> other hooks don't use the `XBRA` protocol properly.
-
 ### When not to use this patch
 
 This patch is unnecessary on machines that have an integrated battery-backed
@@ -27,7 +19,7 @@ system calls.
 
 ## Building
 
-To build `WHYKK.PRG` and `TIMEKPR.PRG`, you will need:
+To build `WHYKK.PRG`, you will need:
 
 * [CMake](https://cmake.org/)
 * [vasm m68k assembler](http://sun.hasenbraten.de/vasm/)
@@ -43,8 +35,7 @@ cmake ..
 make
 ```
 
-This will generate the `WHYKK.PRG` and `TIMEKPR.PRG` files in the `build` 
-directory.
+This will generate the `WHYKK.PRG` file in the `build` directory.
 
 
 ## The Y2K bug on Atari ST
@@ -148,8 +139,7 @@ This interception method, while effective, introduces two main complications:
     redundant, directly conflicts with our patch. When `WHYKK` passes an
     adjusted year (e.g., 1992 for 2024) to `settime`, this incorrect year is
     immediately propagated back to GEMDOS, defeating the purpose of the patch. 
-    This issue is resolved by `TIMEKPR.PRG`, a companion utility that patches 
-    the original XBIOS `settime` routine to bypass the code that updates GEMDOS.
+    This issue is resolved by bypassing the code that updates GEMDOS.
 
 2.  **State loss on warm reset:** After a warm reset (e.g., pressing the reset
     button), `WHYKK.PRG` loses its internal state, including the calculated
@@ -160,18 +150,6 @@ This interception method, while effective, introduces two main complications:
     correctly for years in the range of 2012-2031. Outside of this range, the
     date will be incorrect after a warm reset until it is set again manually.
 
-
-## `TIMEKPR.PRG` - Companion Utility for TOS 2.06+
-
-`TIMEKPR.PRG` is a companion utility specifically designed for Atari ST systems
-running TOS 2.06 or higher. Its purpose is to address a specific anomaly in
-TOS 2.06+ where the XBIOS `settime` function curiously updates the GEMDOS
-system clock, interfering with `WHYKK.PRG`'s year correction mechanism.
-
-When `TIMEKPR.PRG` is installed, it patches the original XBIOS `settime` routine
-to prevent this unnecessary GEMDOS clock update. This ensures that `WHYKK.PRG`
-can correctly manage the year offset without its adjustments being overridden
-by TOS.
 
 ### Technical details
 
@@ -186,22 +164,13 @@ settime:
     ...
 ```
 
-`TIMEKPR` aims to skip these two instructions. Unfortunately, it's not possible
-to override `settime` directly, instead we need intercept the `XBIOS` vector.
-Our silver lining is that TOS implements the XBIOS with a jump table:
+This is addressed by finding the XBIOS jumptable to extract the location of
+`settime` and, if necessary, modifying it to skip the two offending 
+instructions. The resulting address is used to call `settime` directly from
+our XBIOS hook.
 
-```ASM
-xbios:
-    LEA.L jumptable(PC),A0
-    ...
-```
-
-So, all we have to do is to load our own jump-table into `A0` and skip the
-XBIOS vector first instruction. To do this, we decode the `LEA.L` instruction
-to find the ROM's jump table, of which we make a copy and patch the `settime`
-entry to skip the first two instructions.
-
-> This mechanism is fragile, but is necessary for the `WHYKK patch to work.`
+> This mechanism relies on undocumented behavior, but should be reliable in
+> practice.
 
 ## Disclaimer
 

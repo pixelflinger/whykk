@@ -131,21 +131,17 @@ xbios_settime
 ; It leaves in the text section!
 yearOffset  dc.l    32<<25
 
+; end of TSR
+TSR_end
+; *****************************************************************************
+; End of TSR section
+; *****************************************************************************
+
+
 ; -----------------------------------------------------------------------------
 ; Init sequence
 ; -----------------------------------------------------------------------------
-
 init:
-	    move.l	    4(sp),a5        ; BASEPAGE
-	    move.l	    #$100,d7        ; length of basepage
-	    add.l	    12(a5),d7       ; text section size
-	    add.l	    20(a5),d7       ; data section size
-	    add.l	    28(a5),d7       ; bss section size
-        lea         (a5,d7.l),sp    ; set our stack
-
-        ; and shrink memory to what we need
-        Mshrink     a5,d7
-
         ; call our main program
         jsr         main
 
@@ -154,7 +150,10 @@ init:
         beq.b       .exit
 
         ; Terminate and stay resident (Ptermres)
-        Ptermres0   d7
+        lea.l       TSR_end(pc),a0   ; calculate how much memory we need to
+	    suba.l      4(sp),a0         ; keep as (TSR_end - _basepage)
+	    move.l      a0,d0
+        Ptermres0   d0
 
 .exit
         ; Pterm0, exit right away
@@ -250,12 +249,3 @@ msg_welcome
 
 msg_already_installed
         dc.b    7, 'Already installed.', 13, 10, 0
-
-; -----------------------------------------------------------------------------
-; bss section
-; -----------------------------------------------------------------------------
-        even
-        bss
-
-        ; stack must be last
-stack   ds.l    64          ; 256 bytes of stack should be enough
